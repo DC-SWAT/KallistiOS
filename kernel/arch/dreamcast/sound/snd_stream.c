@@ -251,6 +251,8 @@ void snd_pcm16_split_sq(uint32_t *data, uintptr_t left, uintptr_t right, size_t 
     sq_lock((void *)left);
     dcache_pref_block(s);
 
+    ctx = g2_lock();
+
     /* Make sure the FIFOs are empty */
     g2_fifo_wait();
 
@@ -295,14 +297,14 @@ void snd_pcm16_split_sq(uint32_t *data, uintptr_t left, uintptr_t right, size_t 
 
     sq_unlock();
 
+    /* We can wait after unlock because G2 lock disables IRQ */
+    sq_wait();
+
     if(remain) {
         left |= MEM_AREA_P2_BASE;
         right |= MEM_AREA_P2_BASE;
         left += size - remain;
         right += size - remain;
-
-        ctx = g2_lock();
-        sq_wait();
 
         for(; remain >= 4; remain -= 4) {
             *((vuint16 *)left) = *s++;
@@ -310,9 +312,8 @@ void snd_pcm16_split_sq(uint32_t *data, uintptr_t left, uintptr_t right, size_t 
             left += 2;
             right += 2;
         }
-        g2_unlock(ctx);
     }
-
+    g2_unlock(ctx);
 }
 
 
